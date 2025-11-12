@@ -17,6 +17,94 @@ const canvas = document.querySelector('canvas.webgl')
 // Scene
 const scene = new THREE.Scene()
 
+// Audio Modal Elements
+const audioModal = document.getElementById('audioModal')
+const enableAudioBtn = document.getElementById('enableAudio')
+const silentModeBtn = document.getElementById('silentMode')
+
+// Initialize the experience after user choice
+let experienceStarted = false
+
+/**
+ * Audio
+ */
+// Audio loader
+const audioLoader = new THREE.AudioLoader()
+
+// Audio listener and sound will be initialized after camera is created
+let listener
+let ambientSound
+
+// Load and setup ambient sound (will be called after camera/audio initialization)
+function loadAmbientSound() {
+    audioLoader.load('./sounds/ambient.wav', (buffer) => {
+        if (ambientSound) {
+            ambientSound.setBuffer(buffer)
+            ambientSound.setLoop(true)
+            ambientSound.setVolume(0.5)
+            audioReady = true
+            console.log('🎵 Audio loaded and ready! (54s loop)')
+        }
+    }, undefined, (error) => {
+        console.log('❌ Ambient sound failed to load:', error)
+        console.log('⚠️  Make sure you have ambient.wav in static/sounds/ folder')
+        audioReady = true // Allow experience to start even without audio
+    })
+}
+
+// Audio controls
+let audioEnabled = false
+let audioReady = false
+const audioControls = {
+    toggleAudio: () => {
+        if (!audioReady || !ambientSound) return
+        audioEnabled = !audioEnabled
+        if (audioEnabled) {
+            ambientSound.play()
+        } else {
+            ambientSound.pause()
+        }
+    },
+    volume: 0.5
+}
+
+// Modal Event Handlers
+enableAudioBtn.addEventListener('click', () => {
+    audioEnabled = true
+    startExperience()
+})
+
+silentModeBtn.addEventListener('click', () => {
+    audioEnabled = false
+    startExperience()
+})
+
+function startExperience() {
+    // Hide modal
+    audioModal.classList.add('hidden')
+    experienceStarted = true
+    
+    // Start audio if enabled
+    if (audioEnabled && audioReady && ambientSound) {
+        ambientSound.play()
+    }
+    
+    // Start the animation loop
+    tick()
+    
+    console.log(`
+🏚️ HAUNTED HOUSE EXPERIENCE STARTED
+Audio: ${audioEnabled ? 'ENABLED 🔊' : 'SILENT 🔇'}
+
+${audioEnabled ? `
+🎵 AUDIO CONTROLS:
+- Press 'M' to toggle ambient sound
+- Use GUI Audio folder for volume control
+` : ''}
+Navigate with mouse and enjoy the spooky atmosphere! 👻
+    `)
+}
+
 /**
  * Textures
  */
@@ -166,9 +254,9 @@ house.add(door)
 // const fenceGeometry = new THREE.BoxGeometry(0.1, 0.5, 1)
 // const fenceMaterial = new THREE.MeshStandardMaterial({ color: '#b35f45' })
 
-const fence1 = new THREE.Mesh(fenceGeometry, fenceMaterial)
-fence1.position.set(3.45, 0.25, 0)
-house.add(fence1)
+// const fence1 = new THREE.Mesh(fenceGeometry, fenceMaterial)
+// fence1.position.set(3.45, 0.25, 0)
+// house.add(fence1)
 
 // bushes textures
 const bushColorTexture = textureLoader.load('./bush/leaves_forest_ground_1k/textures/leaves_forest_ground_diff_1k.jpg')
@@ -285,6 +373,8 @@ const ghost2 = new THREE.PointLight('#00ffff', 2, 3)
 const ghost3 = new THREE.PointLight('#ffff00', 2, 3)
 scene.add(ghost1, ghost2, ghost3)
 
+// Audio is global ambient sound, no need to attach to objects
+
 
 
 /**
@@ -319,6 +409,16 @@ camera.position.x = 4
 camera.position.y = 2
 camera.position.z = 8
 scene.add(camera)
+
+// Initialize audio listener now that camera exists
+listener = new THREE.AudioListener()
+camera.add(listener)
+
+// Initialize ambient sound
+ambientSound = new THREE.Audio(listener)
+
+// Load the audio file now that everything is initialized
+loadAmbientSound()
 
 // Controls
 const controls = new OrbitControls(camera, canvas)
@@ -388,9 +488,102 @@ sky.material.uniforms['mieCoefficient'].value = 0.1
 sky.material.uniforms['mieDirectionalG'].value = 0.9
 sky.material.uniforms['sunPosition'].value.set(0.3, -0.038, -0.95)
 
+
 // FOG
 const fog = new THREE.FogExp2('#02343f', 0.08)
 scene.fog = fog
+
+// GUI controls for every part of the scene
+const skyFolder = gui.addFolder('Sky')
+skyFolder.add(sky.material.uniforms['turbidity'], 'value').min(0).max(20).step(0.1).name('turbidity')
+skyFolder.add(sky.material.uniforms['rayleigh'], 'value').min(0).max(10).step(0.001).name('rayleigh')
+skyFolder.add(sky.material.uniforms['mieCoefficient'], 'value').min(0).max(0.1).step(0.001).name('mieCoefficient')
+skyFolder.add(sky.material.uniforms['mieDirectionalG'], 'value').min(0).max(1).step(0.001).name('mieDirectionalG')
+
+const fogFolder = gui.addFolder('Fog')
+fogFolder.add(scene.fog, 'density').min(0).max(0.5).step(0.001).name('density')
+
+const lightFolder = gui.addFolder('Light')
+lightFolder.add(ambientLight, 'intensity').min(0).max(2).step(0.001).name('ambient intensity')
+lightFolder.add(directionalLight, 'intensity').min(0).max(2).step(0.001).name('directional intensity')
+lightFolder.add(doorLight, 'intensity').min(0).max(10).step(0.001).name('door intensity')
+
+const groundFolder = gui.addFolder('Ground')
+groundFolder.add(ground.material, 'displacementScale').min(0).max(1).step(0.001).name('displacement scale')
+groundFolder.add(ground.material, 'displacementBias').min(-0.5).max(0.5).step(0.001).name('displacement bias')
+
+const roofFolder = gui.addFolder('Roof')
+roofFolder.add(roofColorTexture.repeat, 'x').min(0).max(5).step(0.01).name('color repeat x')
+roofFolder.add(roofColorTexture.repeat, 'y').min(0).max(5).step(0.01).name('color repeat y')
+roofFolder.add(roofColorTexture.offset, 'x').min(-5).max(5).step(0.01).name('color offset x')
+roofFolder.add(roofColorTexture.offset, 'y').min(-5).max(5).step(0.01).name('color offset y')
+
+const bushFolder = gui.addFolder('Bush')
+bushFolder.add(bushColorTexture.repeat, 'x').min(0).max(5).step(0.01).name('color repeat x')
+bushFolder.add(bushColorTexture.repeat, 'y').min(0).max(5).step(0.01).name('color repeat y')
+bushFolder.add(bushColorTexture.offset, 'x').min(-5).max(5).step(0.01).name('color offset x')
+bushFolder.add(bushColorTexture.offset, 'y').min(-5).max(5).step(0.01).name('color offset y')
+
+const wallFolder = gui.addFolder('Wall')
+wallFolder.add(wallColorTexture.repeat, 'x').min(0).max(5).step(0.01).name('color repeat x')
+wallFolder.add(wallColorTexture.repeat, 'y').min(0).max(5).step(0.01).name('color repeat y')
+wallFolder.add(wallColorTexture.offset, 'x').min(-5).max(5).step(0.01).name('color offset x')
+wallFolder.add(wallColorTexture.offset, 'y').min(-5).max(5).step(0.01).name('color offset y')
+
+const graveFolder = gui.addFolder('Grave')
+graveFolder.add(graveColorTexture.repeat, 'x').min(0).max(5).step(0.01).name('color repeat x')
+graveFolder.add(graveColorTexture.repeat, 'y').min(0).max(5).step(0.01).name('color repeat y')
+graveFolder.add(graveColorTexture.offset, 'x').min(-5).max(5).step(0.01).name('color offset x')
+graveFolder.add(graveColorTexture.offset, 'y').min(-5).max(5).step(0.01).name('color offset y')
+
+const doorFolder = gui.addFolder('Door')
+doorFolder.add(door.material, 'displacementScale').min(0).max(1).step(0.001).name('displacement scale')
+doorFolder.add(door.material, 'displacementBias').min(-0.5).max(0.5).step(0.001).name('displacement bias')
+
+const wallMaterialFolder = gui.addFolder('Wall Material')
+wallMaterialFolder.add(walls.material, 'metalness').min(0).max(1).step(0.001).name('metalness')
+wallMaterialFolder.add(walls.material, 'roughness').min(0).max(1).step(0.001).name('roughness')
+
+const roofMaterialFolder = gui.addFolder('Roof Material')
+roofMaterialFolder.add(roof.material, 'metalness').min(0).max(1).step(0.001).name('metalness')
+roofMaterialFolder.add(roof.material, 'roughness').min(0).max(1).step(0.001).name('roughness')
+
+const bushMaterialFolder = gui.addFolder('Bush Material')
+bushMaterialFolder.add(bushMaterial, 'metalness').min(0).max(1).step(0.001).name('metalness')
+bushMaterialFolder.add(bushMaterial, 'roughness').min(0).max(1).step(0.001).name('roughness')
+
+const graveMaterialFolder = gui.addFolder('Grave Material')
+graveMaterialFolder.add(graveMaterial, 'metalness').min(0).max(1).step(0.001).name('metalness')
+graveMaterialFolder.add(graveMaterial, 'roughness').min(0).max(1).step(0.001).name('roughness')
+
+// Audio controls
+const audioFolder = gui.addFolder('Audio')
+audioFolder.add(audioControls, 'toggleAudio').name('Toggle Audio')
+audioFolder.add(audioControls, 'volume').min(0).max(1).step(0.01).name('Volume').onChange((value) => {
+    if (ambientSound) {
+        ambientSound.setVolume(value)
+    }
+})
+
+// make sure every folder is closed initially
+gui.close()
+
+// Audio is now handled through the modal interaction
+
+// Key controls for audio (only work after experience starts)
+window.addEventListener('keydown', (event) => {
+    if (!experienceStarted) return
+    
+    switch(event.code) {
+        case 'KeyM':
+            audioControls.toggleAudio()
+            console.log('Audio ' + (audioEnabled ? 'enabled' : 'disabled'))
+            break
+    }
+})
+
+// Instructions are now shown after user makes their choice in startExperience()
+
 /**
  * Animate
  */
@@ -398,6 +591,8 @@ const timer = new Timer()
 
 const tick = () =>
 {
+    if (!experienceStarted) return
+    
     // Timer
     timer.update()
     const elapsedTime = timer.getElapsed()
@@ -428,4 +623,5 @@ const tick = () =>
     window.requestAnimationFrame(tick)
 }
 
-tick()
+// Don't start automatically - wait for user choice
+// tick() will be called from startExperience()
