@@ -4,7 +4,7 @@ A spooky 3D haunted house scene built with Three.js as part of Bruno Simon's Thr
 
 > **Note**: This implementation is not exactly the same as the original course project. I've added my own modifications and personal touches to enhance the scene and explore additional Three.js features.
 
-![Haunted House Demo](./demo.gif)
+![Haunted House Demo](./boo.gif)
 
 ## 🚀 Getting Started
 
